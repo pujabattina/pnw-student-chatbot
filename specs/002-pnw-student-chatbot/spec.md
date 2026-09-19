@@ -9,6 +9,16 @@
 **Input**: Stakeholder, student-interview, and initial-corpus findings for a Purdue University
 Northwest (PNW) chatbot that helps students find accurate general university information.
 
+## Clarifications
+
+### Session 2026-09-19
+
+- Q: How should the system handle student question text and any personal information students might enter? → A: Do not retain raw questions; redact and aggregate telemetry.
+- Q: What should happen when an approved source changes or is withdrawn after approval? → A: Disable the source until owner re-approval.
+- Q: How should the system verify that someone reviewing or approving sources is an authorized university reviewer? → A: PNW institutional sign-in plus reviewer roles.
+- Q: Should students need to sign in to use the general-information chatbot? → A: Allow anonymous use.
+- Q: Under normal operating conditions, how quickly should the chatbot return an answer or a safe referral for 95% of questions? → A: Within 5 seconds.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Receive a Grounded University Answer (Priority: P1)
@@ -136,6 +146,16 @@ questions. Verify that the chatbot avoids inventing an answer and provides a rel
 - **FR-014**: The system MUST associate referrals with an appropriate PNW office, advisor, or
   support channel for the student's question category when that information is available in the
   approved corpus.
+- **FR-015**: The system MUST NOT retain raw student question text; operational telemetry MUST
+  redact personal information and be aggregated.
+- **FR-016**: The system MUST disable an Approved Source when it changes or is withdrawn and MUST
+  NOT use it to support answers until its subject-matter owner re-approves it.
+- **FR-017**: The system MUST require PNW institutional sign-in and role-based authorization for
+  reviewers who access, approve, or manage Approved Sources.
+- **FR-018**: The system MUST allow students to use general-information features without signing
+  in and MUST NOT use a student account or record when answering.
+- **FR-019**: Under normal operating conditions, the system MUST return a supported answer or a
+  safe referral within five seconds for at least 95% of student questions.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -143,11 +163,14 @@ questions. Verify that the chatbot avoids inventing an answer and provides a rel
   program, course, academic term, and an error message.
 - **Approved Source**: An official PNW webpage, catalog entry, policy, PDF, table, attachment, or
   linked university document approved for use; includes its owner, link, approval status, effective
-  context, and active or superseded status.
+  context, and active or superseded status. A changed or withdrawn source is disabled pending
+  owner re-approval.
 - **Supported Answer**: A plain-language response tied to one or more Approved Sources, including
   the supporting links and applicable campus, program, course, and term context.
 - **Referral**: A response that explains why a reliable answer is unavailable or inappropriate and
   identifies an appropriate PNW office, advisor, or support channel.
+- **Operational Telemetry**: Aggregated, redacted measurements used to operate and improve the
+  system; it does not contain raw student question text or personal information.
 
 ## Success Criteria *(mandatory)*
 
@@ -167,11 +190,14 @@ questions. Verify that the chatbot avoids inventing an answer and provides a rel
   satisfactory or better in usability testing.
 - **SC-006**: At least 90% of campus-dependent questions in the representative review set either
   receive a campus-appropriate answer or prompt for campus before an answer is provided.
+- **SC-007**: In normal-operating-condition performance testing, at least 95% of student questions
+  receive a supported answer or safe referral within five seconds.
 
 ## Assumptions
 
 - The first release serves students seeking general university information and excludes personal
   records, authenticated actions, and individualized advising or case decisions.
+- Students may use the general-information chatbot anonymously; only source reviewers sign in.
 - Official PNW webpages, current catalog entries, approved policy documents, and official PNW PDFs
   are candidate sources; only material approved under FR-012 may support answers.
 - Initial high-value topics are parking and fees, registration and academic schedules, academic
