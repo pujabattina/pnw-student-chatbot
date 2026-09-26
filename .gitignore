@@ -1,0 +1,34 @@
+.aider*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+*.egg-info/
+
+# Node.js
+node_modules/
+dist/
+build/
+
+# Environment and logs
+.env*
+!.env.example
+!**/.env.example
+*.log
+
+# Test output
+.pytest_cache/
+.coverage
+coverage/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
+deploy/certs/

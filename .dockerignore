@@ -1,0 +1,14 @@
+node_modules/
+.git/
+Dockerfile*
+.dockerignore
+*.log*
+.env*
+coverage/
+.venv/
+__pycache__/
+dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+deploy/certs/

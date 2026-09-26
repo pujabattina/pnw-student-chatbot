@@ -1,0 +1,211 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-suites:
+    name: Detect available suites
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.suites.outputs.backend }}
+      e2e: ${{ steps.suites.outputs.e2e }}
+      performance: ${{ steps.suites.outputs.performance }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Detect test suites
+        id: suites
+        run: |
+          if find backend/app backend/tests -type f -name '*.py' -print -quit 2>/dev/null | grep -q .; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+          fi
+          if find tests/e2e -type f -name '*.spec.ts' -print -quit 2>/dev/null | grep -q .; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+          fi
+          if find backend/tests/performance -type f -name '*.py' -print -quit 2>/dev/null | grep -q .; then
+            echo "performance=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "performance=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.12"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  contract:
+    name: OpenAPI contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.12"
+      - name: Validate OpenAPI contract
+        run: npx --yes @redocly/cli@1.34.5 lint --extends=minimal specs/002-pnw-student-chatbot/contracts/openapi.yaml
+
+  backend:
+    name: Backend
+    needs: detect-suites
+    if: ${{ needs.detect-suites.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+asyncpg://pnw_chatbot:ci_password@localhost:5432/pnw_chatbot
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: pnw_chatbot
+          POSTGRES_USER: pnw_chatbot
+          POSTGRES_PASSWORD: ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pnw_chatbot -d pnw_chatbot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install locked dependencies
+        working-directory: backend
+        run: uv sync --locked --all-groups
+      - name: Lint
+        working-directory: backend
+        run: uv run ruff check app tests
+      - name: Check formatting
+        working-directory: backend
+        run: uv run ruff format --check app tests
+      - name: Type-check
+        working-directory: backend
+        run: uv run mypy
+      - name: Test
+        working-directory: backend
+        run: uv run pytest
+
+  end-to-end:
+    name: End-to-end
+    needs: detect-suites
+    if: ${{ needs.detect-suites.outputs.e2e == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.12"
+      - name: Install Playwright
+        run: |
+          npm install --no-save --package-lock=false @playwright/test@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Create local TLS certificate
+        run: |
+          mkdir -p deploy/certs
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout deploy/certs/privkey.pem \
+            -out deploy/certs/fullchain.pem \
+            -subj "/CN=localhost"
+      - name: Start Compose stack
+        run: docker compose -f deploy/compose.yaml up --build --detach
+      - name: Wait for frontend
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --insecure --fail --silent https://localhost:8443/ >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f deploy/compose.yaml logs
+          exit 1
+      - name: Run Playwright tests
+        run: npx playwright test --config tests/e2e/playwright.config.ts
+      - name: Stop Compose stack
+        if: ${{ always() }}
+        run: docker compose -f deploy/compose.yaml down --volumes
+
+  performance:
+    name: Performance
+    needs: detect-suites
+    if: ${{ needs.detect-suites.outputs.performance == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+asyncpg://pnw_chatbot:ci_password@localhost:5432/pnw_chatbot
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: pnw_chatbot
+          POSTGRES_USER: pnw_chatbot
+          POSTGRES_PASSWORD: ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pnw_chatbot -d pnw_chatbot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install locked dependencies
+        working-directory: backend
+        run: uv sync --locked --all-groups
+      - name: Run performance tests
+        working-directory: backend
+        run: uv run pytest tests/performance

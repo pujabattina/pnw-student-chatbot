@@ -10,12 +10,31 @@
 
 ## Run locally
 
-Implementation will provide the exact scripts. The expected validation sequence is:
+The public proxy requires a TLS certificate and private key at
+`deploy/certs/fullchain.pem` and `deploy/certs/privkey.pem`. For local development, create
+self-signed certificates (browsers will display a trust warning):
+
+```sh
+mkdir -p deploy/certs
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout deploy/certs/privkey.pem \
+  -out deploy/certs/fullchain.pem \
+  -subj "/CN=localhost"
+```
+
+Do not use self-signed certificates in production. Mount a trusted certificate and its private key
+at those paths on the deployment host; certificate files are excluded from Git and Docker build
+contexts.
+
+Start the stack with:
 
 ```sh
 docker compose -f deploy/compose.yaml up --build
 docker compose -f deploy/compose.yaml exec worker python -m app.worker.seed
 ```
+
+The proxy redirects HTTP to HTTPS, forwards `/api/*` to FastAPI, and sends other paths to the SPA.
+Locally, use `https://localhost:8443`; HTTP on port 8080 redirects there.
 
 The `migrate` service must complete successfully before the API and worker become ready; production
 uses `deploy/compose.production.yaml` as an overlay and never bind-mounts application source code.
