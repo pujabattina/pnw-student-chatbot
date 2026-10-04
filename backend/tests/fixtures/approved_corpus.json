@@ -1,0 +1,20 @@
+[
+  {
+    "title": "How to Register for Classes Online",
+    "url": "https://www.pnw.edu/registrar/guides/how-to-register-for-classes-online/",
+    "owner_subject": "registrar-seed-owner",
+    "owner_organization": "Purdue University Northwest"
+  },
+  {
+    "title": "Class Schedules and Course Descriptions",
+    "url": "https://www.pnw.edu/registrar/class-schedules-and-course-descriptions/",
+    "owner_subject": "registrar-seed-owner",
+    "owner_organization": "Purdue University Northwest"
+  },
+  {
+    "title": "Academic Integrity at PNW",
+    "url": "https://www.pnw.edu/academics-research/academic-integrity-at-pnw/",
+    "owner_subject": "academic-integrity-seed-owner",
+    "owner_organization": "Purdue University Northwest"
+  }
+]

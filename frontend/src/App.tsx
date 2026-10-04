@@ -1,7 +1,10 @@
+import AppShell from "./components/AppShell";
+import ChatPage from "./features/chat/ChatPage";
+
 export default function App() {
   return (
-    <main>
-      <h1>PNW Student Chatbot</h1>
-    </main>
+    <AppShell>
+      <ChatPage />
+    </AppShell>
   );
 }
